@@ -19,7 +19,7 @@
  * Difficulty: 1
  */
 int bitAnd(int x, int y) {
-    return 2;
+    return ~(~x|~y);
 }
 
 /*
@@ -30,7 +30,7 @@ int bitAnd(int x, int y) {
  *   Difficulty: 1
  */
 int bitXor(int x, int y) {
-    return 2;
+    return ~(x&y)&~(~x&~y);
 }
 
 /*
@@ -50,7 +50,16 @@ int bitXor(int x, int y) {
  *   1 if x and y have the same sign , 0 otherwise.
  */
 int samesign(int x, int y) {
-    return 2;
+    if(!x){
+        return !y;
+    } else{
+        if(!y){
+            return 0;
+        }
+        else{
+            return !(((x^y))>>31);
+        }
+    }
 }
 
 /*
@@ -63,7 +72,29 @@ int samesign(int x, int y) {
  *   Difficulty: 4
  */
 int logtwo(int v) {
-    return 2;
+    int shift;
+    int r=0;
+
+    shift = ((v>>16)>0)<<4;
+    v = v>>shift;
+    r = r|shift;
+
+    shift = ((v>>8)>0)<<3;
+    v = v>>shift;
+    r = r|shift;
+
+    shift = ((v>>4)>0)<<2;
+    v = v>>shift;
+    r = r|shift;
+
+    shift = ((v>>2)>0)<<1;
+    v = v>>shift;
+    r = r|shift;
+
+    shift = (v>>1)>0;
+    r = r|shift;
+
+    return r;
 }
 
 /*
@@ -76,7 +107,12 @@ int logtwo(int v) {
  *    Difficulty: 2
  */
 int byteSwap(int x, int n, int m) {
-    return 2;
+    int nshift = n<<3;//byte->位移量
+    int mshift = m<<3;
+    int nbyte =(x>>nshift)&0xFF;//取出两位
+    int mbyte =(x>>mshift)&0xFF;
+    int diff = nbyte ^ mbyte;//计算差异
+    return x^((diff<<mshift)|(diff<<nshift));
 }
 
 /*
@@ -88,7 +124,12 @@ int byteSwap(int x, int n, int m) {
  *   Difficulty: 3
  */
 unsigned reverse(unsigned v) {
-    return 2;
+    v = ((v>>1) & 0x55555555)|((v & 0x55555555)<<1);
+    v = ((v>>2) & 0x33333333)|((v & 0x33333333)<<2);
+    v = ((v>>4) & 0x0F0F0F0F)|((v & 0x0F0F0F0F)<<4);
+    v = ((v>>8) & 0x00FF00FF)|((v & 0x00FF00FF)<<8);
+    v = (v>>16)|(v<<16);
+    return v;
 }
 
 /*
@@ -100,7 +141,9 @@ unsigned reverse(unsigned v) {
  *   Difficulty: 3
  */
 int logicalShift(int x, int n) {
-    return 2;
+    x=x>>n;
+    int mask = ~(((1<<31)>>n)<<1);
+    return x&mask;
 }
 
 /*
@@ -112,7 +155,32 @@ int logicalShift(int x, int n) {
  *   Difficulty: 4
  */
 int leftBitCount(int x) {
-    return 2;
+    int v=~x;
+    int isZero = !v;
+    int shift;
+    int r=0;
+
+    shift = (!!(v>>16))<<4;
+    v = v>>shift;
+    r = r|shift;
+
+    shift = (!!(v>>8))<<3;
+    v = v>>shift;
+    r = r|shift;
+
+    shift = (!!(v>>4))<<2;
+    v = v>>shift;
+    r = r|shift;
+
+    shift = (!!(v>>2))<<1;
+    v = v>>shift;
+    r = r|shift;
+
+    shift = !!(v>>1);
+    r = r|shift;
+
+    int result = 32 + ~r;
+    return (isZero << 5) | (result & (isZero + ~0));
 }
 
 /*
@@ -124,7 +192,37 @@ int leftBitCount(int x) {
  *   Difficulty: 4
  */
 unsigned float_i2f(int x) {
-    return 2;
+    unsigned sign = x & 0x80000000;//取出最高位
+    unsigned abs_x=x;
+    unsigned exp, frac;
+    int e=31;
+    
+    if(x==0) return 0;
+    if(x<0) abs_x=-x;//取绝对值
+
+    while(!(abs_x>>e)) e=e-1;//e=最高位1的位置
+    exp=(e+127)<<23;//单精度指数偏移是127，e-1+127；右移23位至正确位置
+    
+    if(e<24){//所有有效位都能放进23位尾数
+        frac=(abs_x<<(23-e)) & 0x7FFFFF;//直接左移对齐
+    }else{//否则需要右移
+        int shift = e-23;
+        frac=(abs_x>>shift) & 0x7FFFFF;
+        unsigned mask=(1<<shift)-1;
+        unsigned remainder=abs_x&mask;//移出的位
+        unsigned half=1<<(shift-1);
+
+        if(remainder>half){//实现四舍六入
+            frac=frac+1;
+        }else{
+            if(remainder==half){
+                if(frac&1){//round to even
+                    frac=frac+1;
+                }
+            }
+        }
+    }
+    return sign+exp+frac;
 }
 
 /*
@@ -139,7 +237,27 @@ unsigned float_i2f(int x) {
  *   Difficulty: 4
  */
 unsigned floatScale2(unsigned uf) {
-    return 2;
+    unsigned sign= uf&0x80000000;
+    unsigned exp = (uf>>23)&0xFF;
+    unsigned frac=uf&0x7FFFFF;
+
+    if(exp==0xFF){
+        return uf;
+    }
+    if(exp==0){
+        if(frac==0)return uf;
+        frac=frac<<1;
+        if(frac&0x800000){
+            exp=1;
+            frac=frac&0x7FFFFF;
+        }
+        return sign|(exp<<23)|frac;
+    }
+    exp=exp+1;
+    if(exp==0xFF){
+        frac=0;
+    }
+    return sign|(exp<<23)|frac;
 }
 
 /*
@@ -156,7 +274,40 @@ unsigned floatScale2(unsigned uf) {
  *   Difficulty: 3
  */
 int float64_f2i(unsigned uf1, unsigned uf2) {
-    return 2;
+    unsigned s = uf2>>31;
+    unsigned e=(uf2>>20) & 0x7FF;
+    unsigned frac_high=uf2 & 0xFFFFF;
+    unsigned frac_low=uf1;
+    int exp;
+    unsigned result;
+    unsigned shift;
+    unsigned frac_part;
+
+    if(e>=0x7FF){
+        return 0x80000000;
+    }
+    if(!e){
+        return 0;
+    }
+    exp=e-1023;
+    if(exp<0){
+        return 0;
+    }
+    if(exp>=31){
+        return 0x80000000;
+    }
+    shift=52-exp;
+    if(shift>=32){
+        frac_part = frac_high >>(shift-32);
+    } else{
+        frac_part = (frac_high<<(32-shift))|(frac_low>>shift);
+    }
+    result=(1<<exp)+frac_part;
+    if(s){
+        return -result;
+    }else{
+        return result;
+    }
 }
 
 /*
@@ -173,5 +324,13 @@ int float64_f2i(unsigned uf1, unsigned uf2) {
  *   Difficulty: 4
  */
 unsigned floatPower2(int x) {
-    return 2;
+    if(x>127){
+        return 0x7F800000;
+    }else if(x>=-126){
+        return (x+127)<<23;
+    }else if(x>=-149){
+        return 1<<(x+149);
+    }else{
+        return 0;
+    }
 }
